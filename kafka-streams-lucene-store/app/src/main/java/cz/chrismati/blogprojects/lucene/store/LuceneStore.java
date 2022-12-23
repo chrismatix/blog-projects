@@ -7,18 +7,16 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.internals.ProcessorStateManager;
 import org.apache.kafka.streams.state.StateSerdes;
-import org.apache.lucene.document.Document;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.Query;
 import org.apache.lucene.store.FSDirectory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.List;
 
 public class LuceneStore implements StateStore, ReadOnlyLuceneStore {
 
@@ -42,17 +40,17 @@ public class LuceneStore implements StateStore, ReadOnlyLuceneStore {
         return writer;
     }
 
-    public List<IndexReader> reader() {
+    public IndexReader reader() {
         try {
-            return List.of(DirectoryReader.open(writer, true, true));
+            return DirectoryReader.open(writer, true, true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public List<Document> search(Query query) {
-        return null;
+    public Analyzer analyzer() {
+        return writer.getAnalyzer();
     }
 
     @Override
@@ -65,7 +63,7 @@ public class LuceneStore implements StateStore, ReadOnlyLuceneStore {
         final String topic = ProcessorStateManager.storeChangelogTopic(context.applicationId(), name());
 
         try {
-            this.path = "/tmp/lucene"; // context.stateDir() + "/" + name();
+            this.path = context.stateDir() + "/" + name();
             FSDirectory dir = FSDirectory.open(Paths.get(path));
 
             IndexWriterConfig config = new IndexWriterConfig();

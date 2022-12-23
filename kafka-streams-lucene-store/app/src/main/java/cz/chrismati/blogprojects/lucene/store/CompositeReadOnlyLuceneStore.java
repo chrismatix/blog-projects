@@ -3,13 +3,10 @@ package cz.chrismati.blogprojects.lucene.store;
 import org.apache.kafka.streams.state.QueryableStoreType;
 import org.apache.kafka.streams.state.internals.StateStoreProvider;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.Query;
+import org.apache.lucene.index.MultiReader;
 
-import java.util.List;
-
-import static java.util.stream.Collectors.toList;
+import java.io.IOException;
 
 public class CompositeReadOnlyLuceneStore implements ReadOnlyLuceneStore {
     private final StateStoreProvider storeProvider;
@@ -26,23 +23,19 @@ public class CompositeReadOnlyLuceneStore implements ReadOnlyLuceneStore {
 
 
     @Override
-    public List<IndexReader> reader() {
-        return storeProvider.stores(storeName, storeType).stream().flatMap(store -> store.reader().stream()).collect(toList());
+    public IndexReader reader() {
+        final IndexReader[] readers = storeProvider.stores(storeName, storeType)
+                .stream().map(ReadOnlyLuceneStore::reader).toArray(IndexReader[]::new);
+
+        try {
+            return new MultiReader(readers);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
-    public List<Document> search(Query query) {
-        final List<ReadOnlyLuceneStore> stores = storeProvider.stores(storeName, storeType);
-/*
-        final IndexSearcher searcher = new IndexSearcher(reader);
-        SortField lastMessageSort = new SortedNumericSortField("last_message_at", SortField.Type.LONG, true);
-        Sort sort = new Sort(lastMessageSort);
-        final TopFieldCollector collector = TopFieldCollector.create(sort, 2000, Integer.MAX_VALUE);
-
-        searcher.search(query, collector);
-        final TopDocs hits = collector.topDocs(cursor, pageSize);
-*/
-
-        return null;
+    public Analyzer analyzer() {
+        return storeProvider.stores(storeName, storeType).get(0).analyzer();
     }
 }
